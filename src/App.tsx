@@ -15,31 +15,34 @@ import EmployeeDashboard from "./pages/EmployeeDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import { OnboardingProvider } from "./contexts/OnboardingContext";
+import { AuthProvider } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <OnboardingProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/admin-login" element={<AdminLogin />} />
-            <Route path="/agreement" element={<Agreement />} />
-            <Route path="/profile-info" element={<ProfileInfo />} />
-            <Route path="/document-upload" element={<DocumentUpload />} />
-            <Route path="/application-progress" element={<ApplicationProgress />} />
-            <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
-            <Route path="/admin-dashboard" element={<AdminDashboard />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </OnboardingProvider>
+    <AuthProvider>
+      <OnboardingProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/admin-login" element={<AdminLogin />} />
+              <Route path="/agreement" element={<Agreement />} />
+              <Route path="/profile-info" element={<ProfileInfo />} />
+              <Route path="/document-upload" element={<DocumentUpload />} />
+              <Route path="/application-progress" element={<ApplicationProgress />} />
+              <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
+              <Route path="/admin-dashboard" element={<AdminDashboard />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </OnboardingProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 

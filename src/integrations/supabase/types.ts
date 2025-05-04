@@ -9,7 +9,136 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      applications: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          has_agreed_to_terms: boolean
+          id: string
+          interview_date: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          has_agreed_to_terms?: boolean
+          id?: string
+          interview_date?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          has_agreed_to_terms?: boolean
+          id?: string
+          interview_date?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          created_at: string
+          filename: string | null
+          id: string
+          notes: string | null
+          status: string
+          type: string
+          updated_at: string
+          upload_date: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          filename?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          type: string
+          updated_at?: string
+          upload_date?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          filename?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          type?: string
+          updated_at?: string
+          upload_date?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          address: string | null
+          city: string | null
+          created_at: string
+          date_of_birth: string | null
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+          phone: string | null
+          state: string | null
+          updated_at: string
+          zip_code: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+          phone?: string | null
+          state?: string | null
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          email?: string
+          first_name?: string
+          id?: string
+          last_name?: string
+          phone?: string | null
+          state?: string | null
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

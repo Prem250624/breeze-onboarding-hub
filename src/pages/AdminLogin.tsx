@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useToast } from "@/components/ui/use-toast";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import OnboardingLayout from "@/components/OnboardingLayout";
+import { useAuth } from "@/contexts/AuthContext";
 
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email"),
@@ -28,6 +29,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 const AdminLogin = () => {
   const { login } = useOnboarding();
+  const { signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -40,19 +42,37 @@ const AdminLogin = () => {
     },
   });
 
-  const onSubmit = (data: FormValues) => {
+  const onSubmit = async (data: FormValues) => {
     setIsLoading(true);
     
-    // Simulate API call with timeout
-    setTimeout(() => {
+    try {
+      // Check if this is an admin email (simple check)
+      if (!data.email.endsWith("@admin.com")) {
+        toast({
+          variant: "destructive",
+          title: "Access denied",
+          description: "This email is not authorized for admin access",
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      await signIn(data.email, data.password);
+      
+      // For backward compatibility with OnboardingContext
       login(true);
+      
       toast({
         title: "Admin login successful",
         description: "Welcome to the admin dashboard!",
       });
-      setIsLoading(false);
+      
       navigate("/admin-dashboard");
-    }, 1000);
+    } catch (error) {
+      console.error("Admin login error:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -78,7 +98,7 @@ const AdminLogin = () => {
                   <FormItem>
                     <FormLabel>Admin Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="admin@example.com" {...field} />
+                      <Input placeholder="admin@admin.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

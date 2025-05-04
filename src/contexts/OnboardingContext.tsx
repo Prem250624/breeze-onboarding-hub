@@ -1,5 +1,9 @@
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { useAuth } from "./AuthContext";
+import { useApplication } from "@/hooks/useApplication";
+import { useProfile } from "@/hooks/useProfile";
+import { useDocuments } from "@/hooks/useDocuments";
 
 // Application status types
 export type ApplicationStatus = 
@@ -103,6 +107,11 @@ const OnboardingContext = createContext<OnboardingContextState>({
 export const useOnboarding = () => useContext(OnboardingContext);
 
 export const OnboardingProvider: React.FC<{children: ReactNode}> = ({ children }) => {
+  const { user, isAdmin: authIsAdmin } = useAuth();
+  const { application } = useApplication();
+  const { profile } = useProfile();
+  const { documents: dbDocuments } = useDocuments();
+  
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [hasAgreed, setHasAgreed] = useState(false);
@@ -110,6 +119,58 @@ export const OnboardingProvider: React.FC<{children: ReactNode}> = ({ children }
   const [profileInfo, setProfileInfo] = useState<ProfileInfo | null>(null);
   const [documents, setDocuments] = useState<Record<DocumentType, DocumentInfo>>(defaultDocuments);
   
+  // Update state when user authentication changes
+  useEffect(() => {
+    setIsLoggedIn(!!user);
+    setIsAdmin(!!authIsAdmin);
+  }, [user, authIsAdmin]);
+  
+  // Update state when application data changes
+  useEffect(() => {
+    if (application) {
+      setHasAgreed(application.has_agreed_to_terms || false);
+      setApplicationStatus(application.status as ApplicationStatus || "pending");
+    }
+  }, [application]);
+  
+  // Update state when profile data changes
+  useEffect(() => {
+    if (profile) {
+      setProfileInfo({
+        firstName: profile.first_name || "",
+        lastName: profile.last_name || "",
+        email: profile.email || "",
+        phone: profile.phone || "",
+        address: profile.address || "",
+        city: profile.city || "",
+        state: profile.state || "",
+        zipCode: profile.zip_code || "",
+        dateOfBirth: profile.date_of_birth ? new Date(profile.date_of_birth) : undefined,
+      });
+    }
+  }, [profile]);
+  
+  // Update state when documents data changes
+  useEffect(() => {
+    if (dbDocuments && dbDocuments.length > 0) {
+      const docsMap: Record<DocumentType, DocumentInfo> = { ...defaultDocuments };
+      
+      dbDocuments.forEach(doc => {
+        const docType = doc.type as DocumentType;
+        docsMap[docType] = {
+          type: docType,
+          status: doc.status as DocumentStatus,
+          fileName: doc.filename || undefined,
+          uploadDate: doc.upload_date ? new Date(doc.upload_date) : undefined,
+          notes: doc.notes || undefined,
+        };
+      });
+      
+      setDocuments(docsMap);
+    }
+  }, [dbDocuments]);
+
+  // Legacy methods for backward compatibility
   const login = (admin: boolean = false) => {
     setIsLoggedIn(true);
     setIsAdmin(admin);

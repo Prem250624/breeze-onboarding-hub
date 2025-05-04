@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useToast } from "@/components/ui/use-toast";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import OnboardingLayout from "@/components/OnboardingLayout";
+import { useAuth } from "@/contexts/AuthContext";
 
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email"),
@@ -28,6 +29,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 const Login = () => {
   const { login } = useOnboarding();
+  const { signIn, isAdmin } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -40,19 +42,26 @@ const Login = () => {
     },
   });
 
-  const onSubmit = (data: FormValues) => {
+  const onSubmit = async (data: FormValues) => {
     setIsLoading(true);
     
-    // Simulate API call with timeout
-    setTimeout(() => {
+    try {
+      await signIn(data.email, data.password);
+      
+      // Use OnboardingContext for backward compatibility
       login(false);
-      toast({
-        title: "Login successful",
-        description: "Welcome back to Breeze Onboarding Hub!",
-      });
+      
+      // If user is admin, redirect to admin dashboard
+      if (isAdmin) {
+        navigate("/admin-dashboard");
+      } else {
+        navigate("/agreement");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+    } finally {
       setIsLoading(false);
-      navigate("/agreement");
-    }, 1000);
+    }
   };
 
   return (
