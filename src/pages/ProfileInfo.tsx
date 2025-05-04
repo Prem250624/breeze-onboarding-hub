@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import { useOnboarding, ProfileInfo } from "@/contexts/OnboardingContext";
+import { useOnboarding, type ProfileInfo as ProfileInfoType } from "@/contexts/OnboardingContext";
 import OnboardingLayout from "@/components/OnboardingLayout";
 import OnboardingStepIndicator from "@/components/OnboardingStepIndicator";
 
@@ -70,8 +70,15 @@ const ProfileInfo = () => {
     setIsSubmitting(true);
     
     // Transform the form data into ProfileInfo
-    const profileData: ProfileInfo = {
-      ...data,
+    const profileData: ProfileInfoType = {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      phone: data.phone,
+      address: data.address,
+      city: data.city,
+      state: data.state,
+      zipCode: data.zipCode,
       dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
     };
     
