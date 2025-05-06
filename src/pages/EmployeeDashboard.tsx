@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useApplication } from "@/hooks/useApplication";
 import { useProfile } from "@/hooks/useProfile";
 import { useDocuments } from "@/hooks/useDocuments";
+import { supabase } from "@/integrations/supabase/client";
 
 const EmployeeDashboard = () => {
   const { user } = useAuth();
