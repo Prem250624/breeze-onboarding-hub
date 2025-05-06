@@ -57,6 +57,10 @@ export const useApplication = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["application", user?.id] });
+      toast({
+        title: "Application updated",
+        description: "Your application has been successfully updated.",
+      });
     },
     onError: (error: any) => {
       toast({

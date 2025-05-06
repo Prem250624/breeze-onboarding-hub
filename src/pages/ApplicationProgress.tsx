@@ -15,6 +15,7 @@ import {
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import OnboardingLayout from "@/components/OnboardingLayout";
 import OnboardingStepIndicator from "@/components/OnboardingStepIndicator";
+import { useApplication } from "@/hooks/useApplication";
 
 const ApplicationProgress = () => {
   const { 
@@ -25,20 +26,25 @@ const ApplicationProgress = () => {
     applicationStatus
   } = useOnboarding();
   const navigate = useNavigate();
+  const { application } = useApplication();
 
   // Redirect checks
-  if (!isLoggedIn) {
-    navigate("/login");
-    return null;
-  }
+  useEffect(() => {
+    if (!isLoggedIn) {
+      navigate("/login");
+    } else if (!hasAgreed) {
+      navigate("/agreement");
+    } else if (!profileInfo) {
+      navigate("/profile-info");
+    } else {
+      // If application is selected/approved, redirect to employee dashboard
+      if (applicationStatus === "selected" || (application && application.status === "selected")) {
+        navigate("/employee-dashboard");
+      }
+    }
+  }, [isLoggedIn, hasAgreed, profileInfo, applicationStatus, application, navigate]);
 
-  if (!hasAgreed) {
-    navigate("/agreement");
-    return null;
-  }
-
-  if (!profileInfo) {
-    navigate("/profile-info");
+  if (!isLoggedIn || !hasAgreed || !profileInfo) {
     return null;
   }
 

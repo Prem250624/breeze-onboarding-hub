@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useOnboarding } from "@/contexts/OnboardingContext";
 import { 
   LayoutDashboard, 
   ClipboardList, 
@@ -18,35 +17,64 @@ import {
   Settings,
   Bell
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useApplication } from "@/hooks/useApplication";
+import { useProfile } from "@/hooks/useProfile";
+import { useDocuments } from "@/hooks/useDocuments";
 
 const EmployeeDashboard = () => {
-  const { isLoggedIn, applicationStatus, profileInfo, isAdmin } = useOnboarding();
+  const { user } = useAuth();
+  const { application } = useApplication();
+  const { profile } = useProfile();
+  const { documents } = useDocuments();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [completionProgress, setCompletionProgress] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  // Calculate document completion for progress
+  useEffect(() => {
+    if (documents) {
+      const totalDocuments = documents.length;
+      const completedDocuments = documents.filter(doc => 
+        doc.status === "verified" || doc.status === "uploaded"
+      ).length;
+      
+      const progress = totalDocuments > 0 
+        ? Math.round((completedDocuments / totalDocuments) * 100) 
+        : 0;
+      
+      setCompletionProgress(progress);
+      setLoading(false);
+    }
+  }, [documents]);
 
   // Redirect if not logged in or not selected
   useEffect(() => {
-    if (!isLoggedIn) {
+    if (!user) {
       navigate("/login");
-    } else if (isAdmin) {
-      navigate("/admin-dashboard");
-    } else if (applicationStatus !== "selected") {
-      navigate("/application-progress");
+      return;
     }
-  }, [isLoggedIn, applicationStatus, isAdmin, navigate]);
+    
+    if (application && application.status !== "selected") {
+      navigate("/application-progress");
+    } else if (application && application.status === "selected") {
+      setLoading(false);
+    }
+  }, [user, application, navigate]);
 
-  useEffect(() => {
-    // Simulate loading progress
-    const timer = setTimeout(() => setCompletionProgress(80), 500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (!isLoggedIn || applicationStatus !== "selected" || !profileInfo) {
-    return null;
+  if (!user || loading || !profile) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-bold mb-2">Loading your dashboard...</h2>
+          <p className="text-onboarding-gray-600">Please wait while we prepare your information.</p>
+        </div>
+      </div>
+    );
   }
 
-  // Mock data for the dashboard
+  // Mock data for the dashboard (this would come from the backend in a real app)
   const tasks = [
     { id: 1, title: "Complete employee handbook review", status: "completed", dueDate: "2025-05-10" },
     { id: 2, title: "Set up company email", status: "completed", dueDate: "2025-05-07" },
@@ -105,11 +133,11 @@ const EmployeeDashboard = () => {
           <div className="p-4 border-t border-onboarding-gray-200">
             <div className="flex items-center">
               <div className="w-8 h-8 rounded-full bg-onboarding-blue flex items-center justify-center text-white">
-                {profileInfo.firstName.charAt(0)}
+                {profile.first_name?.charAt(0) || "U"}
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium">
-                  {profileInfo.firstName} {profileInfo.lastName}
+                  {profile.first_name} {profile.last_name}
                 </p>
                 <p className="text-xs text-onboarding-gray-600">Employee</p>
               </div>
@@ -122,12 +150,22 @@ const EmployeeDashboard = () => {
           <header className="bg-white border-b border-onboarding-gray-200 sticky top-0 z-10">
             <div className="p-4 flex justify-between items-center">
               <h2 className="text-xl font-semibold">Employee Dashboard</h2>
-              <Button variant="outline" onClick={() => {
-                navigate("/");
-                toast({
-                  title: "Logged out",
-                  description: "You have been logged out successfully",
-                });
+              <Button variant="outline" onClick={async () => {
+                try {
+                  await supabase.auth.signOut();
+                  navigate("/");
+                  toast({
+                    title: "Logged out",
+                    description: "You have been logged out successfully",
+                  });
+                } catch (error) {
+                  console.error("Error signing out:", error);
+                  toast({
+                    variant: "destructive",
+                    title: "Error",
+                    description: "Failed to log out. Please try again.",
+                  });
+                }
               }}>
                 Logout
               </Button>
@@ -137,7 +175,7 @@ const EmployeeDashboard = () => {
           <main className="p-6">
             <div className="mb-6">
               <h1 className="text-2xl font-bold mb-2">
-                Welcome, {profileInfo.firstName}!
+                Welcome, {profile.first_name}!
               </h1>
               <p className="text-onboarding-gray-600">
                 Here's your onboarding progress and upcoming tasks.
@@ -152,7 +190,7 @@ const EmployeeDashboard = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold mb-2">80% Complete</div>
+                  <div className="text-2xl font-bold mb-2">{completionProgress}% Complete</div>
                   <Progress value={completionProgress} className="h-2" />
                 </CardContent>
               </Card>

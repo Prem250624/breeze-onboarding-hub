@@ -18,74 +18,105 @@ import {
   User,
   FileText
 } from "lucide-react";
-import { useOnboarding, ApplicationStatus } from "@/contexts/OnboardingContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { ApplicationStatus } from "@/hooks/useApplication";
 
-// Mock employee data
-const employeesData = [
-  {
-    id: 1,
-    name: "Jane Smith",
-    email: "jane.smith@example.com",
-    role: "Frontend Developer",
-    status: "under_review",
-    lastActivity: "2025-05-01",
-    documents: { uploaded: 5, verified: 3 }
-  },
-  {
-    id: 2,
-    name: "John Doe",
-    email: "john.doe@example.com",
-    role: "UX Designer",
-    status: "interview_scheduled",
-    lastActivity: "2025-05-02",
-    documents: { uploaded: 6, verified: 6 }
-  },
-  {
-    id: 3,
-    name: "Alex Johnson",
-    email: "alex.johnson@example.com",
-    role: "Backend Developer",
-    status: "selected",
-    lastActivity: "2025-05-03",
-    documents: { uploaded: 6, verified: 6 }
-  },
-  {
-    id: 4,
-    name: "Sarah Williams",
-    email: "sarah.williams@example.com",
-    role: "Product Manager",
-    status: "rejected",
-    lastActivity: "2025-04-28",
-    documents: { uploaded: 5, verified: 2 }
-  },
-  {
-    id: 5,
-    name: "Michael Brown",
-    email: "michael.brown@example.com",
-    role: "Data Analyst",
-    status: "pending",
-    lastActivity: "2025-05-04",
-    documents: { uploaded: 3, verified: 0 }
-  }
-];
+interface EmployeeData {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: ApplicationStatus;
+  lastActivity: string;
+  documents: { uploaded: number; verified: number };
+  user_id: string;
+}
 
 const AdminDashboard = () => {
-  const { isLoggedIn, isAdmin } = useOnboarding();
+  const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [employees, setEmployees] = useState(employeesData);
+  const [employees, setEmployees] = useState<EmployeeData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch real application data
+  useEffect(() => {
+    const fetchApplications = async () => {
+      try {
+        setLoading(true);
+        
+        // Get all applications with profile data
+        const { data: applications, error: applicationsError } = await supabase
+          .from('applications')
+          .select(`
+            id, 
+            status, 
+            has_agreed_to_terms, 
+            updated_at, 
+            user_id,
+            profiles:profiles(first_name, last_name, email)
+          `);
+
+        if (applicationsError) throw applicationsError;
+
+        // Get document counts for each user
+        const allEmployees: EmployeeData[] = [];
+
+        for (const app of applications || []) {
+          // Get document counts
+          const { data: documentsData } = await supabase
+            .from('documents')
+            .select('status')
+            .eq('user_id', app.user_id);
+
+          const profile = app.profiles as any;
+          const documents = documentsData || [];
+          
+          const uploadedCount = documents.filter(d => d.status !== 'not_uploaded').length;
+          const verifiedCount = documents.filter(d => d.status === 'verified').length;
+          
+          allEmployees.push({
+            id: app.id,
+            user_id: app.user_id,
+            name: `${profile.first_name} ${profile.last_name}`,
+            email: profile.email,
+            role: "Applicant", // Default role
+            status: app.status as ApplicationStatus,
+            lastActivity: app.updated_at,
+            documents: { uploaded: uploadedCount, verified: verifiedCount }
+          });
+        }
+
+        setEmployees(allEmployees);
+      } catch (error) {
+        console.error("Error fetching applications:", error);
+        toast({
+          variant: "destructive",
+          title: "Error fetching data",
+          description: "Could not load application data. Please try again later.",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (isAdmin) {
+      fetchApplications();
+    }
+  }, [isAdmin, toast]);
 
   // Redirect if not logged in or not an admin
   useEffect(() => {
-    if (!isLoggedIn) {
+    if (!user) {
       navigate("/login");
     } else if (!isAdmin) {
       navigate("/");
     }
-  }, [isLoggedIn, isAdmin, navigate]);
+  }, [user, isAdmin, navigate]);
 
-  if (!isLoggedIn || !isAdmin) {
+  if (!user || !isAdmin) {
     return null;
   }
 
@@ -127,15 +158,35 @@ const AdminDashboard = () => {
     }
   };
 
-  const updateEmployeeStatus = (id: number, status: ApplicationStatus) => {
-    setEmployees(employees.map(employee => 
-      employee.id === id ? { ...employee, status } : employee
-    ));
+  const updateEmployeeStatus = async (userId: string, status: ApplicationStatus) => {
+    try {
+      const { error } = await supabase
+        .from('applications')
+        .update({ 
+          status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setEmployees(employees.map(employee => 
+        employee.user_id === userId ? { ...employee, status } : employee
+      ));
 
-    toast({
-      title: "Status updated",
-      description: `Employee status has been updated to ${status.replace("_", " ")}`,
-    });
+      toast({
+        title: "Status updated",
+        description: `Employee status has been updated to ${status.replace("_", " ")}`,
+      });
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast({
+        variant: "destructive",
+        title: "Update failed",
+        description: "Could not update employee status. Please try again."
+      });
+    }
   };
 
   // Calculate statistics
@@ -283,97 +334,103 @@ const AdminDashboard = () => {
               
               <Card>
                 <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-onboarding-gray-200">
-                          <th className="text-left p-4 font-medium text-onboarding-gray-600">Employee</th>
-                          <th className="text-left p-4 font-medium text-onboarding-gray-600">Role</th>
-                          <th className="text-left p-4 font-medium text-onboarding-gray-600">Status</th>
-                          <th className="text-left p-4 font-medium text-onboarding-gray-600">Documents</th>
-                          <th className="text-left p-4 font-medium text-onboarding-gray-600">Last Activity</th>
-                          <th className="text-right p-4 font-medium text-onboarding-gray-600">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredEmployees.map((employee) => (
-                          <tr 
-                            key={employee.id} 
-                            className="border-b border-onboarding-gray-200 hover:bg-onboarding-gray-50"
-                          >
-                            <td className="p-4">
-                              <div className="flex items-center">
-                                <div className="w-8 h-8 rounded-full bg-onboarding-light-blue flex items-center justify-center text-onboarding-blue font-medium mr-3">
-                                  {employee.name.charAt(0)}
+                  {loading ? (
+                    <div className="p-8 text-center">Loading applications...</div>
+                  ) : filteredEmployees.length === 0 ? (
+                    <div className="p-8 text-center">No applications found</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-onboarding-gray-200">
+                            <th className="text-left p-4 font-medium text-onboarding-gray-600">Employee</th>
+                            <th className="text-left p-4 font-medium text-onboarding-gray-600">Role</th>
+                            <th className="text-left p-4 font-medium text-onboarding-gray-600">Status</th>
+                            <th className="text-left p-4 font-medium text-onboarding-gray-600">Documents</th>
+                            <th className="text-left p-4 font-medium text-onboarding-gray-600">Last Activity</th>
+                            <th className="text-right p-4 font-medium text-onboarding-gray-600">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredEmployees.map((employee) => (
+                            <tr 
+                              key={employee.id} 
+                              className="border-b border-onboarding-gray-200 hover:bg-onboarding-gray-50"
+                            >
+                              <td className="p-4">
+                                <div className="flex items-center">
+                                  <div className="w-8 h-8 rounded-full bg-onboarding-light-blue flex items-center justify-center text-onboarding-blue font-medium mr-3">
+                                    {employee.name.charAt(0)}
+                                  </div>
+                                  <div>
+                                    <p className="font-medium">{employee.name}</p>
+                                    <p className="text-xs text-onboarding-gray-600">{employee.email}</p>
+                                  </div>
                                 </div>
-                                <div>
-                                  <p className="font-medium">{employee.name}</p>
-                                  <p className="text-xs text-onboarding-gray-600">{employee.email}</p>
+                              </td>
+                              <td className="p-4">{employee.role}</td>
+                              <td className="p-4">
+                                <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(employee.status)}`}>
+                                  {getStatusIcon(employee.status)}
+                                  <span className="ml-1">
+                                    {employee.status.replace("_", " ").charAt(0).toUpperCase() + employee.status.replace("_", " ").slice(1)}
+                                  </span>
                                 </div>
-                              </div>
-                            </td>
-                            <td className="p-4">{employee.role}</td>
-                            <td className="p-4">
-                              <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(employee.status)}`}>
-                                {getStatusIcon(employee.status)}
-                                <span className="ml-1">
-                                  {employee.status.replace("_", " ").charAt(0).toUpperCase() + employee.status.replace("_", " ").slice(1)}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <div className="text-xs">
-                                <span className="font-medium">{employee.documents.verified}/{employee.documents.uploaded}</span> verified
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <div className="text-xs text-onboarding-gray-600">
-                                {new Date(employee.lastActivity).toLocaleDateString()}
-                              </div>
-                            </td>
-                            <td className="p-4 text-right">
-                              <div className="inline-flex items-center">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="mr-2"
-                                  onClick={() => {
-                                    toast({
-                                      title: "View Details",
-                                      description: `Viewing details for ${employee.name}`,
-                                    });
-                                  }}
-                                >
-                                  View Details
-                                </Button>
-                                
-                                {employee.status !== "selected" && employee.status !== "rejected" && (
-                                  <Button
-                                    size="sm"
-                                    variant="default"
-                                    onClick={() => updateEmployeeStatus(employee.id, "selected")}
-                                  >
-                                    Approve
-                                  </Button>
-                                )}
-                                
-                                {employee.status !== "rejected" && (
+                              </td>
+                              <td className="p-4">
+                                <div className="text-xs">
+                                  <span className="font-medium">{employee.documents.verified}/{employee.documents.uploaded}</span> verified
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <div className="text-xs text-onboarding-gray-600">
+                                  {new Date(employee.lastActivity).toLocaleDateString()}
+                                </div>
+                              </td>
+                              <td className="p-4 text-right">
+                                <div className="inline-flex items-center">
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="ml-2"
-                                    onClick={() => updateEmployeeStatus(employee.id, "rejected")}
+                                    className="mr-2"
+                                    onClick={() => {
+                                      toast({
+                                        title: "View Details",
+                                        description: `Viewing details for ${employee.name}`,
+                                      });
+                                    }}
                                   >
-                                    Reject
+                                    View Details
                                   </Button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                                  
+                                  {employee.status !== "selected" && employee.status !== "rejected" && (
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      onClick={() => updateEmployeeStatus(employee.user_id, "selected")}
+                                    >
+                                      Approve
+                                    </Button>
+                                  )}
+                                  
+                                  {employee.status !== "rejected" && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="ml-2"
+                                      onClick={() => updateEmployeeStatus(employee.user_id, "rejected")}
+                                    >
+                                      Reject
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </Tabs>
